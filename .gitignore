@@ -1,0 +1,33 @@
+venv
+.venv
+__pycache__
+
+app_mf180_balance.py
+app_mf180_read_sms.py
+app_ucs2.py
+app_decode.py
+.env
+.DS_Store
+
+/frontend/dist
+/frontend/node_modules
+
+
+# local env files
+.env.local
+.env.*.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

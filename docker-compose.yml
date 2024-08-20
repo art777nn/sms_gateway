@@ -1,0 +1,106 @@
+version: '2.4'
+
+x-env: &default-env
+  CELERY_BROKER_URL: 'amqp://rabbitmq:5672/'
+  RMQ_HOST: rabbitmq
+  DB_NAME: ${DB_NAME}
+  DB_USER: ${DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD}
+  DB_HOST: ${DB_HOST}
+  DB_PORT: ${DB_PORT}
+  MODEM_PORT: '/dev/ttyUSB3'
+  TZ: 'Europe/Moscow'
+
+services:
+  rabbitmq:
+    image: rabbitmq:management  # Используем образ RabbitMQ с поддержкой управления
+    ports:
+      - "5672:5672"  # Порт для подключения приложений (AMQP)
+      - "15672:15672"  # Порт для веб-интерфейса управления
+    environment:
+      RABBITMQ_DEFAULT_USER: ''  # Имя пользователя по умолчанию
+      RABBITMQ_DEFAULT_PASS: ''  # Пароль пользователя по умолчанию
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq  # Хранение данных RabbitMQ
+    networks:
+      - smsgateway
+
+  fastapi:
+    image: smsgateway
+    build:
+       context: .
+       dockerfile: Dockerfile  # Укажите Dockerfile для вашего FastAPI приложения
+    command: fastapi run app/api.py
+    ports:
+      - "8000:8000"
+    networks:
+      - smsgateway
+    environment:
+      <<: *default-env  # Наследование переменных окружения
+
+  celery_worker:
+    image: smsgateway
+    working_dir: /var/app/app/
+    command: celery -A tasks worker --loglevel=info  # Укажите модуль и объект Celery
+    depends_on:
+      - rabbitmq
+    networks:
+      - smsgateway
+    environment:
+      <<: *default-env 
+
+  modem_worker:
+    image: smsgateway
+    working_dir: /var/app/app/
+    command: python mf180_worker.py 
+    depends_on:
+      - rabbitmq
+    networks:
+      - smsgateway
+    restart: always
+    environment:
+      <<: *default-env  
+    devices:
+      - /dev/ttyUSB3:/dev/ttyUSB3
+
+  modem_handler:
+    image: smsgateway
+    working_dir: /var/app/app/
+    command: python modem_handler.py 
+    depends_on:
+      - rabbitmq
+    networks:
+      - smsgateway
+    restart: always
+    environment:
+      <<: *default-env
+
+  celery_beat:
+    image: smsgateway
+    working_dir: /var/app/app/
+    command: celery -A tasks beat --loglevel=info  # Укажите модуль и объект Celery
+    depends_on:
+      - rabbitmq
+      - celery_worker
+    networks:
+      - smsgateway
+    environment:
+      <<: *default-env  # Наследование переменных окружения
+
+  frontend:
+    image: smsgateway-f
+    build:
+       context: .
+       dockerfile: Dockerfile.frontend  # Укажите Dockerfile для вашего FastAPI приложения
+    networks:
+      - smsgateway
+    depends_on:
+      - fastapi
+    ports:
+      - "8001:80"
+
+networks:
+  smsgateway:
+    driver: bridge  # Используется драйвер по умолчанию
+volumes:
+  rabbitmq_data:  # Устойчивое хранилище для данных RabbitMQ
