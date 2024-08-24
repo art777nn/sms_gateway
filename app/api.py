@@ -34,8 +34,8 @@ async def get_sms(sender: str = '', dttm: str = '', limit: int = 10):
 
 
 @app.get("/get-calls")
-async def get_calls(dttm: str = '', limit: int = 10):
-    return CallRepository().get_by_caller_dttm(dttm=dttm, limit=limit)
+async def get_calls(caller:str='', dttm: str = '', limit: int = 10):
+    return CallRepository().get_by_caller_dttm(caller=caller, dttm=dttm, limit=limit)
 
 
 @app.get("/get-balance")
