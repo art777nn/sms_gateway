@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic.dataclasses import dataclass
 
-from repository import SmsRepository, BalanceRepository, EnvRepository, CallRepository
+from repository import SmsRepository, EnvRepository, CallRepository
 from modem_command import ModemCommand
 from fastapi.middleware.cors import CORSMiddleware
 

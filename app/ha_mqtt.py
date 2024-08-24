@@ -51,7 +51,7 @@ class HaMQTT:
     def _connect(self):
         self.client.connect(
             host=os.getenv('MQTT_HOST', 'localhost'),
-            port=os.getenv('MQTT_PORT', 1883),
+            port=int(os.getenv('MQTT_PORT', 1883))
         )
 
     def publish(self, topic: str, data: str):
@@ -83,14 +83,6 @@ class HaMQTT:
                   json.dumps(notify_configuration))
 
 
-
-    # print(config_messages)
-    # print(config_calls)
-    #
-    # time.sleep(2)
-    #
-    # c.publish(config_calls.get('stat_t'),CallRepository().get_by_caller_dttm(caller='', dttm='2024-08-20', limit=1)[0].to_json())
-    # c.publish(config_messages.get('stat_t'),SmsRepository().get_by_sender_and_dttm(sender='', dttm='2024-08-20', limit=1)[0].to_json())
 def send_sms(client, userdata, msg):
         print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
 
