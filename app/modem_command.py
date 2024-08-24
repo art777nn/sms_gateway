@@ -25,7 +25,7 @@ class ModemCommand:
     def publish(self, command, priority: int=5):
         body = json.dumps({"command": command})
         logger.info(f"Publish command: {body}")
-        self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=pika.BasicProperties(priority=str(priority)))
+        self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=pika.BasicProperties(priority=priority))
 
     def drop_message(self, id):
         self.publish(command=commands.drop_sms_by_id(id), priority=10)
