@@ -4,6 +4,7 @@ import pika
 import json
 import os
 import logging
+from at_commands import commands
 
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,6 @@ if __name__ == '__main__':
     modem = mf180()
     modem.open_serial()
     modem.rmq_connection()
-    modem.write(mf180_commands.gsm_mode())
-    modem.write(mf180_commands.txt_mode())
-    modem.write(mf180_commands.deny_incoming_call())
+    modem.write(commands.gsm_mode())
+    modem.write(commands.txt_mode())
     modem.loop()
