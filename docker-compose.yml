@@ -11,7 +11,7 @@ x-env: &default-env
   MODEM_PORT: '/dev/ttyUSB3'
   TZ: 'Europe/Moscow'
   MQTT_HOST: ${MQTT_HOST}
-  MQTT_PORT: 1883
+  MQTT_PORT: ${MQTT_PORT}
 
 services:
   rabbitmq:
