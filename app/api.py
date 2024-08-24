@@ -1,5 +1,7 @@
 from fastapi import FastAPI
-from repository import SmsRepositry, BalanceRepository, EnvRepository, CallRepository
+from pydantic.dataclasses import dataclass
+
+from repository import SmsRepository, BalanceRepository, EnvRepository, CallRepository
 from modem_command import ModemCommand
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,15 +19,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@dataclass
+class Sms:
+    phone:str = ''
+    text:str = ''
+
+    def __init__(self, phone: str, text: str):
+        self.phone = phone
+        self.text = text
 
 @app.get("/get-sms")
 async def get_sms(sender: str = '', dttm: str = '', limit: int = 10):
-    return SmsRepositry().get_by_sender_and_dttm(sender=sender, dttm=dttm, limit=limit)
+    return SmsRepository().get_by_sender_and_dttm(sender=sender, dttm=dttm, limit=limit)
 
 
 @app.get("/get-calls")
 async def get_calls(dttm: str = '', limit: int = 10):
-    return CallRepository().get_by_dttm(dttm=dttm, limit=limit)
+    return CallRepository().get_by_caller_dttm(dttm=dttm, limit=limit)
 
 
 @app.get("/get-balance")
@@ -52,3 +62,10 @@ async def get_signal_type():
 async def custom_at(command):
     modem = ModemCommand()
     modem.publish(command)
+
+
+@app.post("/send-sms")
+async def custom_at(sms: Sms):
+    modem = ModemCommand()
+    modem.send_sms(sms.phone, sms.text)
+

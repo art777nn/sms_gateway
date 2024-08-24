@@ -10,6 +10,8 @@ x-env: &default-env
   DB_PORT: ${DB_PORT}
   MODEM_PORT: '/dev/ttyUSB3'
   TZ: 'Europe/Moscow'
+  MQTT_HOST: ${MQTT_HOST}
+  MQTT_PORT: 1883
 
 services:
   rabbitmq:
@@ -98,6 +100,18 @@ services:
       - fastapi
     ports:
       - "8001:80"
+
+  ha_integration:
+    image: smsgateway
+    working_dir: /var/app/app/
+    command: python ha_mqtt.py
+    depends_on:
+      - rabbitmq
+    networks:
+      - smsgateway
+    restart: always
+    environment:
+      <<: *default-env
 
 networks:
   smsgateway:

@@ -1,10 +1,15 @@
+from optparse import Option
+from typing import Optional, Any
+
 import pika
 import json
 import logging
 import os
-from repository import Message, SmsRepositry, EnvRepository, Env, CallRepository
+
+from app.ha_mqtt import HaMQTT, get_device_configuration, DEVICE_CLASS_ENUM
+from repository import Message, SmsRepository, EnvRepository, Env, CallRepository, Call
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import traceback
 from modem_command import ModemCommand
 
@@ -13,8 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class Handler:
-    def process(self, data):
+
+    result: Any = None
+
+    def process(self, data) -> Optional[Any]:
         logger.info(data)
+
+        return None
+
+    def exec_integrations(self) -> None:
+        logger.info(f'Integration for {self.__class__.__name__} not set')
 
     def decode_ucs2_string(self, encoded_string):
         """
@@ -23,8 +36,6 @@ class Handler:
         :param encoded_string: Закодированная строка в формате UCS2 в виде шестнадцатеричных символов.
         :return: Декодированная строка.
         """
-        # Преобразуем строку в байты
-        # Мы предполагаем, что строка состоит из нечётного числа символов (например, '00410042' для 'AB')
         bytes_data = bytes.fromhex(encoded_string)
 
         # Декодируем по 16-битам (UCS2) в строку
@@ -33,11 +44,9 @@ class Handler:
 
     def decode_gsm7bit(self, encoded_message):
         """Декодирует 7-битное сообщение в формате GSM."""
-        # Декодируем по частям
         decoded_message = ""
         n = len(encoded_message)
 
-        # Обработаем каждый байт
         for i in range(n):
             byte = encoded_message[i]
             for bit in range(7):
@@ -53,10 +62,35 @@ class Handler:
 class call_handler(Handler):
 
     call_repo: CallRepository = CallRepository()
+    mqtt_service = HaMQTT()
 
-    def process(self, data):
+    def process(self, data) -> Optional[Call]:
         logger.info(f"Got incoming call: {data}")
-        self.call_repo.create(caller=self.extract_phone_number(data))
+
+        caller = self.extract_phone_number(data)
+
+        if not caller:
+            logger.info(f"Undefined caller: {data}")
+            caller = data
+
+        # Если в течении 30 секунд продолжает звонить телефон, то не делаем записи
+        dttm =  (datetime.now() - timedelta(seconds=30)).isoformat()
+
+        if self.call_repo.get_by_caller_dttm(caller=caller,
+                                             dttm=dttm,
+                                             limit=1):
+            logger.info(f"Already created: {data}")
+            return
+
+        self.result = self.call_repo.create(caller=self.extract_phone_number(data))
+
+    def exec_integrations(self) -> None:
+
+        configuration = get_device_configuration(DEVICE_CLASS_ENUM.CALL)
+        self.mqtt_service.publish(
+            topic=configuration.get('stat_t'),
+            data=self.result.to_json()
+        )
 
     def extract_phone_number(self, input_string):
         # Искать номер телефона в формате +79999999999
@@ -151,6 +185,14 @@ class sms_handler(Handler):
     original_data = None
     prepared_data = None
     modem_service: ModemCommand = ModemCommand()
+    mqtt_service = HaMQTT()
+
+    def exec_integrations(self) -> None:
+        configuration = get_device_configuration(DEVICE_CLASS_ENUM.MESSAGE)
+        self.mqtt_service.publish(
+            topic=configuration.get('stat_t'),
+            data=self.result.to_json()
+        )
 
     def process(self, data):
         self.original_data = data
@@ -160,7 +202,8 @@ class sms_handler(Handler):
 
         # Сохраняем сообщения в репо
         if messages:
-            SmsRepositry().create(messages=messages)
+            res = SmsRepository().create(messages=messages)
+            self.result = res[0]
 
         for message in messages:
             self.modem_service.drop_message(message.message_id)
@@ -252,9 +295,13 @@ class ModemHandler:
         cls = globals().get(handler)
 
         if cls:
-            cls().process(obj_body.get('data'))  # Создаем и возвращаем экземпляр
+            instance = cls()
+            instance.process(obj_body.get('data'))  # Создаем и возвращаем экземпляр
+
+            if instance.result:
+                instance.exec_integrations()
         else:
-            logger.warning(f"Обработчик для '{handler}' не найден")
+            logger.warning(f"Handler for '{handler}' not found")
             Handler().process(data=obj_body.get('data'))
 
 

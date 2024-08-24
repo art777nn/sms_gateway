@@ -1,12 +1,10 @@
-import pika
 import json
 import logging
 import os
-from repository import Message, SmsRepositry
-import re
-from datetime import datetime
-import traceback
-from mf180_worker import mf180_commands
+
+import pika
+
+from at_commands import commands
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ModemCommand:
 
     queue = 'commands'
-    rmq_host = os.getenv('RMQ_HOST', 'locahost')
+    rmq_host = os.getenv('RMQ_HOST', 'localhost')
 
     def __init__(self) -> None:
         logger.info(f"Connect to RMQ: {self.rmq_host}")
@@ -22,28 +20,31 @@ class ModemCommand:
             pika.ConnectionParameters(host=self.rmq_host)
         )
         self.channel = connection.channel()
-        # Убедитесь, что очередь существует
         self.channel.queue_declare(queue=self.queue)
 
-    def publish(self, command):
+    def publish(self, command, priority: int=5):
         body = json.dumps({"command": command})
         logger.info(f"Publish command: {body}")
-        self.channel.basic_publish(exchange='', routing_key=self.queue, body=body)
+        self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=pika.BasicProperties(priority=str(priority)))
 
     def drop_message(self, id):
-        self.publish(command=mf180_commands.drop_sms_by_id(id))
+        self.publish(command=commands.drop_sms_by_id(id), priority=10)
 
     def make_ussd(self, number):
-        self.publish(command=mf180_commands.ussd(number))
+        self.publish(command=commands.ussd(number))
 
     def get_sms(self):
-        self.publish(command=mf180_commands.get_all_sms())
+        self.publish(command=commands.get_all_sms())
 
     def get_operator(self):
-        self.publish(command=mf180_commands.get_operator())
+        self.publish(command=commands.get_operator())
 
     def get_signal_level(self):
-        self.publish(command=mf180_commands.get_signal_level())
+        self.publish(command=commands.get_signal_level())
 
     def get_signal_type(self):
-        self.publish(command=mf180_commands.get_signal_type())
+        self.publish(command=commands.get_signal_type())
+
+    def send_sms(self, phone, text):
+        self.publish(command=commands.send_sms(phone))
+        self.publish(command=f"{text}\x1A", priority=10)

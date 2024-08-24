@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import List, Optional
+
 import psycopg2
 import os
 import json
@@ -19,6 +21,15 @@ class Message:
         self.message_receive_dttm = kwargs.get('message_receive_dttm', None)
         self.sender = kwargs.get('sender', None)
         self.text = kwargs.get('text', None)
+
+    def to_json(self) -> str:
+        return json.dumps({
+            "id": self.id,
+            "message_id": self.message_id,
+            "message_receive_dttm": self.message_receive_dttm.isoformat(),
+            "sender": self.sender,
+            "text": self.text
+        })
 
 
 @dataclass
@@ -41,6 +52,12 @@ class Call:
     def __init__(self, *args, **kwargs) -> None:
         self.caller = kwargs.get('caller', None)
         self.created_at = kwargs.get('created_at', None)
+
+    def to_json(self) -> str:
+        return json.dumps({
+            "caller": self.caller,
+            "created_at": self.created_at.isoformat(),
+        })
 
 
 class DefaultConnection:
@@ -70,7 +87,7 @@ class Entity:
         self.init_entity()
 
 
-class SmsRepositry(DefaultConnection, Entity):
+class SmsRepository(DefaultConnection, Entity):
 
     def init_entity(self):
         statement = '''
@@ -87,7 +104,7 @@ class SmsRepositry(DefaultConnection, Entity):
 
         self.cur.execute(statement)
 
-    def get_by_sender_and_dttm(self, sender: str, dttm: str, limit=10):
+    def get_by_sender_and_dttm(self, sender: str, dttm: str, limit=10) -> List[Message]:
         statement = f'''
             SELECT id, message_id, message_receive_dttm, sender, text FROM SMS where 1 = 1
         '''
@@ -101,7 +118,6 @@ class SmsRepositry(DefaultConnection, Entity):
         statement = statement + " order by message_receive_dttm desc"
 
         statement = statement + f" limit {limit}"
-        print(statement)
         self.cur.execute(statement)
 
         result = []
@@ -118,7 +134,7 @@ class SmsRepositry(DefaultConnection, Entity):
 
         return result
 
-    def create(self, messages):
+    def create(self, messages) -> List[Message]:
 
         statement = '''
             INSERT INTO SMS(message_id, message_receive_dttm, sender, text) VALUES {values} RETURNING id, message_id, message_receive_dttm, sender, text
@@ -149,48 +165,6 @@ class SmsRepositry(DefaultConnection, Entity):
             )
 
         return result
-
-    def get_ids_not_dropped(self):
-
-        statement = '''
-        SELECT id from SMS where is_dropped = false
-        '''
-
-    def set_is_dropped(self, id):
-
-        statement = '''
-        UPDATE SMS SET is_dropped=trye where id = {id}
-        '''
-
-
-    def __init__(self) -> None:
-        super().__init__()
-
-        self.init_entity()
-
-class BalanceRepository(DefaultConnection, Entity):
-
-    def init_entity(self):
-        statement = '''
-        CREATE TABLE IF NOT EXISTS Balance(
-            created_at timestamp NOT NULL default now(),
-            balance numeric(16,4)
-        )
-        '''
-
-        self.cur.execute(statement)
-
-    def create(self, balance):
-        self.cur.execute(f'INSERT INTO Balance(balance) VALUES ({balance})')
-
-    def get_last_balance(self):
-        self.cur.execute(
-            'SELECT created_at, balance FROM Balance order by created_at desc limit 1'
-        )
-
-        res = self.cur.fetchone()
-
-        return res[0], res[1]
 
     def __init__(self) -> None:
         super().__init__()
@@ -253,17 +227,24 @@ class CallRepository(DefaultConnection, Entity):
 
         self.cur.execute(statement)
 
-    def create(self, caller):
+    def create(self, caller) -> Optional[Call]:
         statement = f'''
-        INSERT INTO Calls(caller) VALUES ('{caller}')
+        INSERT INTO Calls(caller) VALUES ('{caller}') RETURNING caller, created_at;
         '''
-
         self.cur.execute(statement)
+        res = self.cur.fetchone()
 
-    def get_by_dttm(self, dttm: str, limit=10):
+        if res:
+            return Call(caller=res[0], created_at=res[1])
+
+        return None
+
+    def get_by_caller_dttm(self,caller:str, dttm: str, limit=10) -> List[Call]:
         statement = f'''
             SELECT caller, created_at FROM Calls where 1 = 1
         '''
+        if caller and len(caller) > 0:
+            statement = statement + f" and caller like '%{caller}%'"
 
         if dttm and len(dttm) > 0:
             statement = statement + f" and created_at > '{dttm}'"
@@ -271,7 +252,6 @@ class CallRepository(DefaultConnection, Entity):
         statement = statement + " order by created_at desc"
 
         statement = statement + f" limit {limit}"
-        print(statement)
         self.cur.execute(statement)
 
         result = []
