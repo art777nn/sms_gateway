@@ -6,7 +6,7 @@ import json
 import logging
 import os
 
-from app.ha_mqtt import HaMQTT, get_device_configuration, DEVICE_CLASS_ENUM
+from ha_mqtt import HaMQTT, get_device_configuration, DEVICE_CLASS_ENUM
 from repository import Message, SmsRepository, EnvRepository, Env, CallRepository, Call
 import re
 from datetime import datetime, timedelta

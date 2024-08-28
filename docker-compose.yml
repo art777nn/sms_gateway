@@ -2,7 +2,7 @@ version: '2.4'
 
 x-env: &default-env
   CELERY_BROKER_URL: 'amqp://rabbitmq:5672/'
-  RMQ_HOST: rabbitmq
+  RMQ_HOST: ${RMQ_HOST}
   DB_NAME: ${DB_NAME}
   DB_USER: ${DB_USER}
   DB_PASSWORD: ${DB_PASSWORD}

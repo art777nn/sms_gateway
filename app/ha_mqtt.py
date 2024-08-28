@@ -1,9 +1,16 @@
-from paho.mqtt.client import Client
+import threading
+import time
+
+from paho.mqtt.client import Client, MQTTMessage
 import os
 import json
 
-from typing_extensions import override
+from pydantic.dataclasses import dataclass
 
+from modem_command import ModemCommand
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DEVICE_CLASS_ENUM:
     MESSAGE = "message"
@@ -22,6 +29,7 @@ BASE_DEVICE = {
 }
 
 COMMAND_SMS_TOPIC = f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/send"
+COMMAND_SMS_TOPIC_ATTR = f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/attr"
 
 def get_device_configuration(device_class: str, values: dict = None) -> dict:
     massage = {
@@ -45,7 +53,7 @@ class HaMQTT:
     client: Client = None
 
     def __init__(self):
-        self.client = Client()
+        self.client = Client(client_id=DEVICE_ID)
         self._connect()
 
     def _connect(self):
@@ -55,6 +63,7 @@ class HaMQTT:
         )
 
     def publish(self, topic: str, data: str):
+        logger.info(f'Publish to {topic}: {data}')
         if not self.client.is_connected():
             self._connect()
 
@@ -68,9 +77,17 @@ class HaMQTT:
 
         notify_configuration = {
             "device": BASE_DEVICE,
+            "platform": "mqtt",
+            "schema": "json",
             "uniq_id" : DEVICE_CLASS_ENUM.MESSAGE_SENDER,
             "name": DEVICE_CLASS_ENUM.MESSAGE_SENDER,
             "command_topic": COMMAND_SMS_TOPIC,
+            "availability":
+                {
+                    "topic": f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/available",
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                },
         }
 
         self.publish(f'homeassistant/sensor/{DEVICE_ID}_{DEVICE_CLASS_ENUM.MESSAGE}/config',
@@ -82,12 +99,42 @@ class HaMQTT:
         self.publish(f'homeassistant/notify/{DEVICE_ID}_{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/config',
                   json.dumps(notify_configuration))
 
+    def publish_available_sender(self):
+        while True:
+            self.publish(f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/available", "online")
+            time.sleep(15)
 
-def send_sms(client, userdata, msg):
-        print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
+def beat():
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting...")
 
-if __name__ == '__main__':
+def main():
+    logging.basicConfig(
+        level=logging.INFO,  # Уровень логгирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат логов
+        datefmt='%Y-%m-%d %H:%M:%S',  # Формат даты и времени
+        handlers=[
+            # logging.FileHandler("app.log"),  # Запись логов в файл
+            logging.StreamHandler()  # Вывод логов в консоль
+        ],
+    )
+    modem = ModemCommand()
+
+    def send_sms(client, userdata, msg: MQTTMessage):
+        logger.info(f'Got msg from ha: {msg.payload}')
+        message = json.loads(msg.payload)
+        modem.send_sms(message.get('phone'), message.get('text'))
+
     service = HaMQTT()
     service.publish_discovery_messages()
-    service.client.subscribe(COMMAND_SMS_TOPIC)
+    service.client.subscribe([(COMMAND_SMS_TOPIC, 0), (COMMAND_SMS_TOPIC_ATTR, 0)])
     service.client.on_message = send_sms
+    service.client.loop_start()
+    threading.Thread(target=HaMQTT.publish_available_sender, daemon=True, args=[service]).start()
+    beat()
+
+if __name__ == '__main__':
+    main()
