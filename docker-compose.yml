@@ -1,13 +1,8 @@
 version: '2.4'
 
 x-env: &default-env
-  CELERY_BROKER_URL: 'amqp://rabbitmq:5672/'
-  RMQ_HOST: ${RMQ_HOST}
-  DB_NAME: ${DB_NAME}
-  DB_USER: ${DB_USER}
-  DB_PASSWORD: ${DB_PASSWORD}
-  DB_HOST: ${DB_HOST}
-  DB_PORT: ${DB_PORT}
+  RMQ_DSN: ${RMQ_DSN}
+  POSTGRES_DSN: ${POSTGRES_DSN}
   MODEM_PORT: '/dev/ttyUSB3'
   TZ: 'Europe/Moscow'
   MQTT_HOST: ${MQTT_HOST}

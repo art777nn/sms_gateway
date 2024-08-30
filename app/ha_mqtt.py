@@ -68,7 +68,7 @@ devices = {
                 "payload_available": "online",
                 "payload_not_available": "offline",
             },
-    })
+    }).to_json()
 }
 
 
@@ -81,8 +81,8 @@ class HaMQTT:
 
     def _connect(self):
         self.client.connect(
-            host=os.getenv('MQTT_HOST', 'localhost'),
-            port=int(os.getenv('MQTT_PORT', 1883))
+            host=os.getenv('MQTT_HOST'),
+            port=int(os.getenv('MQTT_PORT'))
         )
 
     def publish(self, topic: str, data: str):

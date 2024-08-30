@@ -28,15 +28,13 @@ class mf180:
     stop_bits = serial.STOPBITS_ONE  # Количество стоп-битов
     ser = None
     channel = None
-    rmq_host = os.getenv('RMQ_HOST', 'locahost')
     command_queue = 'commands'
     response_queue = 'response'
 
 
     def rmq_connection(self):
-        logger.info(f"Connect to RMQ: {self.rmq_host}")
         connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=self.rmq_host)
+            parameters=pika.URLParameters(os.getenv("RMQ_DSN"))
         )
         self.channel = connection.channel()
         self.channel.queue_declare(queue=self.command_queue)

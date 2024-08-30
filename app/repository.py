@@ -9,18 +9,11 @@ import json
 
 @dataclass
 class Message:
-    id: int
-    message_id: str
-    message_receive_dttm: datetime
-    sender: str
-    text: str
-
-    def __init__(self, *args, **kwargs) -> None:
-        self.id = kwargs.get('id', None)
-        self.message_id = kwargs.get('message_id', None)
-        self.message_receive_dttm = kwargs.get('message_receive_dttm', None)
-        self.sender = kwargs.get('sender', None)
-        self.text = kwargs.get('text', None)
+    id: int = None
+    message_id: str = None
+    message_receive_dttm: datetime = None
+    sender: str = None
+    text: str = None
 
     def to_json(self) -> str:
         return json.dumps({
@@ -34,24 +27,21 @@ class Message:
 
 @dataclass
 class Env:
-    key: str
-    data: any
-    updated_at: str
+    key: str = None
+    data: any = None
+    updated_at: str = None
 
-    def __init__(self, *args, **kwargs) -> None:
-        self.key = kwargs.get('key', None)
-        self.data = kwargs.get('data', None)
-        self.updated_at = kwargs.get('updated_at', None)
-
+    def to_json(self) -> str:
+        return json.dumps({
+            "key": self.key,
+            "data": self.any,
+            "updated_at": self.updated_at,
+        })
 
 @dataclass
 class Call:
-    caller: str
-    created_at: datetime
-
-    def __init__(self, *args, **kwargs) -> None:
-        self.caller = kwargs.get('caller', None)
-        self.created_at = kwargs.get('created_at', None)
+    caller: str = None
+    created_at: datetime = None
 
     def to_json(self) -> str:
         return json.dumps({
@@ -74,6 +64,7 @@ class DefaultConnection:
             host=os.getenv("DB_HOST", "localhost"),
             port=int(os.getenv("DB_PORT", 5432)),
         )
+        psycopg2.connect(os.getenv("POSTGRES_DSN"))
 
         self.con.autocommit = True
         self.cur = self.con.cursor()
