@@ -77,7 +77,7 @@ services:
     ports:
       - "8001:80"
     volumes:
-      - /opt/docker/sms_gateway/records:/var/app/app/records
+      - /opt/docker/sms_gateway/records:/var/records
 
   ha_integration:
     image: smsgateway
