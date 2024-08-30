@@ -48,6 +48,10 @@ services:
       <<: *default-env  
     devices:
       - /dev/ttyUSB3:/dev/ttyUSB3
+      - /dev/ttyUSB2:/dev/ttyUSB2
+    volumes:
+      - /opt/docker/sms_gateway/records:/var/app/app/records
+
 
   modem_handler:
     image: smsgateway
@@ -72,6 +76,8 @@ services:
       - fastapi
     ports:
       - "8001:80"
+    volumes:
+      - /opt/docker/sms_gateway/records:/var/app/app/records
 
   ha_integration:
     image: smsgateway

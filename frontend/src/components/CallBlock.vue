@@ -9,7 +9,8 @@
  
         <span>
           {{ m.caller }}
-        </span>       
+        </span>
+        <audio controls :src=`/records/{m.id}.wav`></audio>
       </div>
 
     </div>

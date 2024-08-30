@@ -19,8 +19,8 @@ class ModemCommand:
         self.channel = RabbitMQConnection(dsn).get_channel()
         self.channel.queue_declare(queue=self.queue)
 
-    def publish(self, command, priority: int=5):
-        body = json.dumps({"command": command})
+    def publish(self, command: str, data: dict = None, priority: int=5):
+        body = json.dumps({"command": command, "data": data})
         logger.info(f"Publish command: {body}")
         self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=BasicProperties(priority=priority))
 
@@ -55,3 +55,12 @@ class ModemCommand:
             commands.send_sms(phone),
             f"{text}\x1A"
         ])
+
+    def answer(self, id):
+        self.publish(command=commands.answer(), data={"id": id})
+
+    def call(self, phone):
+        self.publish(command=commands.call(phone))
+
+    def hang_up(self):
+        self.publish(command=commands.hang_up())

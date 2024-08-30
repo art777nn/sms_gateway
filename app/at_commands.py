@@ -47,3 +47,15 @@ class commands:
     @staticmethod
     def send_sms(phone):
         return str(f"AT+CMGS=\"{phone}\"")
+
+    @staticmethod
+    def answer():
+        return str("ATA")
+
+    @staticmethod
+    def hang_up():
+        return str("AT+CHUP")
+
+    @staticmethod
+    def call(phone: str):
+        return str(f"ATD{phone};")

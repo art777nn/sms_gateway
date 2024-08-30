@@ -63,7 +63,9 @@ class Handler:
 class call_handler(Handler):
 
     call_repo: CallRepository = CallRepository()
+    modem_commands = ModemCommand()
     mqtt_service = HaMQTT()
+    result: Call = None
 
     def process(self, data) -> Optional[Call]:
         logger.info(f"Got incoming call: {data}")
@@ -74,8 +76,7 @@ class call_handler(Handler):
             logger.info(f"Undefined caller: {data}")
             caller = data
 
-        # Если в течении 30 секунд продолжает звонить телефон, то не делаем записи
-        dttm =  (datetime.now() - timedelta(seconds=30)).isoformat()
+        dttm = (datetime.now() - timedelta(seconds=30)).isoformat()
 
         if self.call_repo.get_by_caller_dttm(caller=caller,
                                              dttm=dttm,
@@ -84,6 +85,9 @@ class call_handler(Handler):
             return
 
         self.result = self.call_repo.create(caller=self.extract_phone_number(data))
+
+        self.modem_commands.answer(self.result.id)
+
 
     def exec_integrations(self) -> None:
 

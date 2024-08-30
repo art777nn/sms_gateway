@@ -40,11 +40,13 @@ class Env:
 
 @dataclass
 class Call:
+    id: int = None
     caller: str = None
     created_at: datetime = None
 
     def to_json(self) -> str:
         return json.dumps({
+            "id": self.id,
             "caller": self.caller,
             "created_at": self.created_at.isoformat(),
         })
@@ -203,6 +205,7 @@ class CallRepository(DefaultConnection, Entity):
     def init_entity(self):
         statement = '''
         CREATE TABLE IF NOT EXISTS Calls(
+            id SERIAL,
             caller varchar(64),
             created_at timestamp default now()
         )
@@ -212,19 +215,19 @@ class CallRepository(DefaultConnection, Entity):
 
     def create(self, caller) -> Optional[Call]:
         statement = f'''
-        INSERT INTO Calls(caller) VALUES ('{caller}') RETURNING caller, created_at;
+        INSERT INTO Calls(caller) VALUES ('{caller}') RETURNING id, caller, created_at;
         '''
         self.cur.execute(statement)
         res = self.cur.fetchone()
 
         if res:
-            return Call(caller=res[0], created_at=res[1])
+            return Call(id=res[0], caller=res[1], created_at=res[2])
 
         return None
 
     def get_by_caller_dttm(self,caller:str, dttm: str, limit=10) -> List[Call]:
         statement = f'''
-            SELECT caller, created_at FROM Calls where 1 = 1
+            SELECT id, caller, created_at FROM Calls where 1 = 1
         '''
         if caller and len(caller) > 0:
             statement = statement + f" and caller like '%{caller}%'"
@@ -239,7 +242,7 @@ class CallRepository(DefaultConnection, Entity):
 
         result = []
         for row in self.cur.fetchall():
-            result.append(Call(caller=row[0], created_at=row[1]))
+            result.append(Call(id=row[0], caller=row[1], created_at=row[2]))
 
         return result
 

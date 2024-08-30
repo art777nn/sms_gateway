@@ -1,13 +1,14 @@
+import threading
 from typing import List
 from rmq_connection import RabbitMQConnection
 
 import serial
 import time
-import pika
 import json
 import os
 import logging
 from at_commands import commands
+from call_recorder import record
 
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,11 @@ class mf180:
                 if message:
                     if isinstance(message, dict):
                         self.write(message['command'])
+
+                        # Запись входящего звонка
+                        if message['command'] == commands.answer():
+                            threading.Thread(target=record(str(message['data'].get('id'))), daemon=True).start()
+
                     if isinstance(message, list):
                         for cmd in message:
                             self.write(cmd['command'])
