@@ -6,8 +6,7 @@ import json
 import logging
 import os
 
-from app.ha_mqtt import DiscoveryMessage, BASE_DEVICE
-from ha_mqtt import HaMQTT, MESSAGE_SENSOR, CALL_SENSOR
+from ha_mqtt import HaMQTT, MESSAGE_SENSOR, CALL_SENSOR, DiscoveryMessage, BASE_DEVICE
 from repository import Message, SmsRepository, EnvRepository, Env, CallRepository, Call
 import re
 from datetime import datetime, timedelta
