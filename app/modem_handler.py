@@ -6,6 +6,7 @@ import json
 import logging
 import os
 
+from rmq_connection import RabbitMQConnection
 from ha_mqtt import HaMQTT, MESSAGE_SENSOR, CALL_SENSOR, DiscoveryMessage, BASE_DEVICE
 from repository import Message, SmsRepository, EnvRepository, Env, CallRepository, Call
 import re
@@ -268,15 +269,10 @@ class sms_handler(Handler):
 class ModemHandler:
 
     queue = 'response'
-    rmq_host = os.getenv('RMQ_HOST', 'locahost')
 
     def __init__(self) -> None:
-        logger.info(f"Connect to RMQ: {self.rmq_host}")
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=self.rmq_host)
-        )
-        self.channel = connection.channel()
-        # Убедитесь, что очередь существует
+        dsn = os.getenv('RMQ_DSN')
+        self.channel = RabbitMQConnection(dsn).get_channel()
         self.channel.queue_declare(queue=self.queue)
 
     def consume(self):
