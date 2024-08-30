@@ -10,9 +10,9 @@
         <span>
           {{ m.caller }}
         </span>
-        <audio controls :src=`/records/{m.id}.wav`></audio>
       </div>
 
+      <audio controls :src=get_record_url(m.id)></audio>
     </div>
   </div>
 </template>
@@ -52,6 +52,9 @@ export default {
     isNumber(part) {
       return !isNaN(part); // Проверяем, является ли часть числом
     },
+    get_record_url(id) {
+      return `/records/${id}.wav`
+    }
   },
 }
 </script>
