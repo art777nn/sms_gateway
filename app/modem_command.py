@@ -2,8 +2,8 @@ import json
 import logging
 import os
 from typing import List
-
-import pika
+from rmq_connection import RabbitMQConnection
+from pika import BasicProperties
 
 from at_commands import commands
 
@@ -13,20 +13,16 @@ logger = logging.getLogger(__name__)
 class ModemCommand:
 
     queue = 'commands'
-    rmq_host = os.getenv('RMQ_HOST', 'localhost')
 
     def __init__(self) -> None:
-        logger.info(f"Connect to RMQ: {self.rmq_host}")
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=self.rmq_host)
-        )
-        self.channel = connection.channel()
+        dsn = os.getenv('RMQ_DSN')
+        self.channel = RabbitMQConnection(dsn).get_channel()
         self.channel.queue_declare(queue=self.queue)
 
     def publish(self, command, priority: int=5):
         body = json.dumps({"command": command})
         logger.info(f"Publish command: {body}")
-        self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=pika.BasicProperties(priority=priority))
+        self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=BasicProperties(priority=priority))
 
     def publish_many(self, cmds: List[str], priority: int=5):
         stmt = []
@@ -34,7 +30,7 @@ class ModemCommand:
             stmt.append({"command": cmd})
 
         logger.info(f"Publish command: {stmt}")
-        self.channel.basic_publish(exchange='', routing_key=self.queue, body=json.dumps(stmt), properties=pika.BasicProperties(priority=priority))
+        self.channel.basic_publish(exchange='', routing_key=self.queue, body=json.dumps(stmt), properties=BasicProperties(priority=priority))
 
     def drop_message(self, id):
         self.publish(command=commands.drop_sms_by_id(id), priority=10)

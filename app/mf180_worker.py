@@ -1,4 +1,5 @@
 from typing import List
+from rmq_connection import RabbitMQConnection
 
 import serial
 import time
@@ -21,7 +22,7 @@ PERIODICAL_TASKS = {
 }
 
 class mf180:
-    port = os.getenv('MODEM_PORT', '/dev/ttyUSB3')  # Замените на ваш порт
+    port:str = None  # Замените на ваш порт
     baud_rate = 115200  # Скорость передачи данных
     data_bits = 8  # Количество бит данных
     parity = serial.PARITY_NONE  # Бит четности (N - No parity)
@@ -31,14 +32,12 @@ class mf180:
     command_queue = 'commands'
     response_queue = 'response'
 
-
-    def rmq_connection(self):
-        connection = pika.BlockingConnection(
-            parameters=pika.URLParameters(os.getenv("RMQ_DSN"))
-        )
-        self.channel = connection.channel()
+    def __init__(self):
+        dsn = os.getenv("RMQ_DSN")
+        self.channel = RabbitMQConnection(dsn).get_channel()
         self.channel.queue_declare(queue=self.command_queue)
         self.channel.queue_declare(queue=self.response_queue)
+        self.port = os.getenv('MODEM_PORT', '/dev/ttyUSB3')
 
     def get_message(self) -> dict | List | None:
         method_frame, header_frame, body = self.channel.basic_get(
@@ -185,7 +184,6 @@ if __name__ == '__main__':
 
     modem = mf180()
     modem.open_serial()
-    modem.rmq_connection()
     modem.write(commands.gsm_mode())
     modem.write(commands.txt_mode())
     modem.loop()
