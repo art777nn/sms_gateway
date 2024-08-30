@@ -34,7 +34,7 @@ class Env:
     def to_json(self) -> str:
         return json.dumps({
             "key": self.key,
-            "data": self.any,
+            "data": self.data,
             "updated_at": self.updated_at,
         })
 
@@ -57,15 +57,7 @@ class DefaultConnection:
     cur = None
 
     def __init__(self) -> None:
-        self.con = psycopg2.connect(
-            database=os.getenv("DB_NAME", "db"),
-            user=os.getenv("DB_USER", "user"),
-            password=os.getenv("DB_PASSWORD", "password"),
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", 5432)),
-        )
-        psycopg2.connect(os.getenv("POSTGRES_DSN"))
-
+        self.con = psycopg2.connect(os.getenv("POSTGRES_DSN"))
         self.con.autocommit = True
         self.cur = self.con.cursor()
 

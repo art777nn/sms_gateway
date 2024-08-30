@@ -15,8 +15,8 @@ services:
       - "5672:5672"  # Порт для подключения приложений (AMQP)
       - "15672:15672"  # Порт для веб-интерфейса управления
     environment:
-      RABBITMQ_DEFAULT_USER: ''  # Имя пользователя по умолчанию
-      RABBITMQ_DEFAULT_PASS: ''  # Пароль пользователя по умолчанию
+      RABBITMQ_DEFAULT_USER: 'guest'  # Имя пользователя по умолчанию
+      RABBITMQ_DEFAULT_PASS: 'guest'  # Пароль пользователя по умолчанию
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq  # Хранение данных RabbitMQ
     networks:
