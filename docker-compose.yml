@@ -40,17 +40,6 @@ services:
     environment:
       <<: *default-env  # Наследование переменных окружения
 
-  celery_worker:
-    image: smsgateway
-    working_dir: /var/app/app/
-    command: celery -A tasks worker --loglevel=info  # Укажите модуль и объект Celery
-    depends_on:
-      - rabbitmq
-    networks:
-      - smsgateway
-    environment:
-      <<: *default-env 
-
   modem_worker:
     image: smsgateway
     working_dir: /var/app/app/
@@ -76,18 +65,6 @@ services:
     restart: always
     environment:
       <<: *default-env
-
-  celery_beat:
-    image: smsgateway
-    working_dir: /var/app/app/
-    command: celery -A tasks beat --loglevel=info  # Укажите модуль и объект Celery
-    depends_on:
-      - rabbitmq
-      - celery_worker
-    networks:
-      - smsgateway
-    environment:
-      <<: *default-env  # Наследование переменных окружения
 
   frontend:
     image: smsgateway-f

@@ -1,3 +1,5 @@
+from typing import List
+
 import serial
 import time
 import pika
@@ -9,6 +11,14 @@ from at_commands import commands
 
 logger = logging.getLogger(__name__)
 
+
+PERIODICAL_TASKS = {
+    commands.ussd("*105#"): 3600,
+    commands.get_all_sms(): 20,
+    commands.get_operator(): 60,
+    commands.get_signal_level(): 60,
+    commands.get_signal_type(): 60
+}
 
 class mf180:
     port = os.getenv('MODEM_PORT', '/dev/ttyUSB3')  # Замените на ваш порт
@@ -32,7 +42,7 @@ class mf180:
         self.channel.queue_declare(queue=self.command_queue)
         self.channel.queue_declare(queue=self.response_queue)
 
-    def get_message(self):
+    def get_message(self) -> dict | List | None:
         method_frame, header_frame, body = self.channel.basic_get(
             queue=self.command_queue, auto_ack=True
         )
@@ -120,11 +130,27 @@ class mf180:
         time.sleep(1)
 
     def loop(self):
+        timers = {}
         while True:
-            message = self.get_message()
             try:
+                # Input command from RMQ
+                message = self.get_message()
                 if message:
-                    self.write(message['command'])
+                    if isinstance(message, dict):
+                        self.write(message['command'])
+                    if isinstance(message, list):
+                        for cmd in message:
+                            self.write(cmd['command'])
+
+                # Periodical tasks
+                for task in PERIODICAL_TASKS:
+                    if task not in timers:
+                        timers[task] = time.perf_counter()
+
+                    if time.perf_counter() - timers[task] >= PERIODICAL_TASKS[task]:
+                        self.write(task)
+                        timers[task] = time.perf_counter()
+
 
                 if self.ser.in_waiting > 0:
                     row = self.ser.read_until().decode('utf-8').strip()
@@ -136,7 +162,7 @@ class mf180:
                         )
                         self.allow_handle[command](self, row)
 
-            except Exception:
+            except Exception as e:
                 self.close_serial()
                 exit(127)
 

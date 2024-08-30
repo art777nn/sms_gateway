@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from typing import List
 
 import pika
 
@@ -27,6 +28,14 @@ class ModemCommand:
         logger.info(f"Publish command: {body}")
         self.channel.basic_publish(exchange='', routing_key=self.queue, body=body, properties=pika.BasicProperties(priority=priority))
 
+    def publish_many(self, cmds: List[str], priority: int=5):
+        stmt = []
+        for cmd in cmds:
+            stmt.append({"command": cmd})
+
+        logger.info(f"Publish command: {stmt}")
+        self.channel.basic_publish(exchange='', routing_key=self.queue, body=json.dumps(stmt), properties=pika.BasicProperties(priority=priority))
+
     def drop_message(self, id):
         self.publish(command=commands.drop_sms_by_id(id), priority=10)
 
@@ -46,5 +55,7 @@ class ModemCommand:
         self.publish(command=commands.get_signal_type())
 
     def send_sms(self, phone, text):
-        self.publish(command=commands.send_sms(phone))
-        self.publish(command=f"{text}\x1A", priority=10)
+        self.publish_many([
+            commands.send_sms(phone),
+            f"{text}\x1A"
+        ])

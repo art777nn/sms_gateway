@@ -6,7 +6,8 @@ import json
 import logging
 import os
 
-from ha_mqtt import HaMQTT, get_device_configuration, DEVICE_CLASS_ENUM
+from app.ha_mqtt import DiscoveryMessage, BASE_DEVICE
+from ha_mqtt import HaMQTT, MESSAGE_SENSOR, CALL_SENSOR
 from repository import Message, SmsRepository, EnvRepository, Env, CallRepository, Call
 import re
 from datetime import datetime, timedelta
@@ -86,9 +87,9 @@ class call_handler(Handler):
 
     def exec_integrations(self) -> None:
 
-        configuration = get_device_configuration(DEVICE_CLASS_ENUM.CALL)
+        configuration = DiscoveryMessage(BASE_DEVICE, CALL_SENSOR)
         self.mqtt_service.publish(
-            topic=configuration.get('stat_t'),
+            topic=configuration.stat_t,
             data=self.result.to_json()
         )
 
@@ -188,9 +189,9 @@ class sms_handler(Handler):
     mqtt_service = HaMQTT()
 
     def exec_integrations(self) -> None:
-        configuration = get_device_configuration(DEVICE_CLASS_ENUM.MESSAGE)
+        configuration = DiscoveryMessage(BASE_DEVICE, MESSAGE_SENSOR)
         self.mqtt_service.publish(
-            topic=configuration.get('stat_t'),
+            topic=configuration.stat_t,
             data=self.result.to_json()
         )
 

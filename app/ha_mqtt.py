@@ -1,23 +1,41 @@
+import json
+import logging
+import os
 import threading
 import time
+from dataclasses import dataclass, asdict
 
 from paho.mqtt.client import Client, MQTTMessage
-import os
-import json
-
-from pydantic.dataclasses import dataclass
 
 from modem_command import ModemCommand
-import logging
 
 logger = logging.getLogger(__name__)
 
-class DEVICE_CLASS_ENUM:
-    MESSAGE = "message"
-    CALL = "call"
-    BALANCE = "balance"
-    SIGNAL_LEVEL = "signal_level"
-    MESSAGE_SENDER = "message_sender"
+@dataclass
+class DiscoveryMessage:
+    device: dict
+    uniq_id: str
+    name: str
+    stat_t: str
+    unit_of_meas: str = None
+    device_class: str = None
+    state_class: str = None
+    value_template: str = "{{ value }}"
+
+    def __init__(self, base_device, device_class, additional: dict = None):
+        self.device = base_device
+        self.uniq_id = device_class
+        self.name = device_class
+        self.stat_t = f"smsgateway/{device_class}"
+
+        if additional:
+            for key, value in additional.items():
+                self.__dict__[key] = value
+
+
+    def to_json(self):
+        return json.dumps(asdict(self))
+
 
 DEVICE_ID = "4c078a33-c9d7-492a-aa71-3834a0da33c5"
 
@@ -28,28 +46,33 @@ BASE_DEVICE = {
     "model": "MODEM"
 }
 
-COMMAND_SMS_TOPIC = f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/send"
-COMMAND_SMS_TOPIC_ATTR = f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/attr"
+MESSAGE_SENSOR = "message"
+CALL_SENSOR = "call"
+MESSAGE_SENDER_DEVICE = "message_sender"
 
-def get_device_configuration(device_class: str, values: dict = None) -> dict:
-    massage = {
-            "device": BASE_DEVICE,
-            "uniq_id" : device_class,
-            "name": device_class,
-            "stat_t": f"smsgateway/{device_class}",
-            "unit_of_meas": None,
-            "device_class": None,
-            "state_class": None,
-            "value_template" : "{{ value }}"
-    }
+DISCOVERY_MESSAGE_TOPIC = f'homeassistant/sensor/{DEVICE_ID}_{MESSAGE_SENSOR}/config'
+DISCOVERY_CALL_TOPIC = f'homeassistant/sensor/{DEVICE_ID}_{CALL_SENSOR}/config'
+DISCOVERY_MESSAGE_SENDER_TOPIC = f'homeassistant/notify/{DEVICE_ID}_{MESSAGE_SENDER_DEVICE}/config'
 
-    if values and len(values.keys()) > 0:
-        massage.update(values)
+COMMAND_SMS_TOPIC = f"smsgateway/{MESSAGE_SENDER_DEVICE}/send"
+AVAILABLE_SMS_TOPIC = f"smsgateway/{MESSAGE_SENDER_DEVICE}/available"
 
-    return  massage
+devices = {
+    DISCOVERY_MESSAGE_TOPIC: DiscoveryMessage(BASE_DEVICE, MESSAGE_SENSOR).to_json(),
+    DISCOVERY_CALL_TOPIC: DiscoveryMessage(BASE_DEVICE, CALL_SENSOR).to_json(),
+    DISCOVERY_MESSAGE_SENDER_TOPIC: DiscoveryMessage(BASE_DEVICE, MESSAGE_SENDER_DEVICE, {
+        "command_topic": COMMAND_SMS_TOPIC,
+        "availability":
+            {
+                "topic": AVAILABLE_SMS_TOPIC,
+                "payload_available": "online",
+                "payload_not_available": "offline",
+            },
+    })
+}
+
 
 class HaMQTT:
-
     client: Client = None
 
     def __init__(self):
@@ -70,39 +93,15 @@ class HaMQTT:
         self.client.publish(topic=topic, payload=data, qos=0)
 
     def publish_discovery_messages(self):
-        config_messages = get_device_configuration(DEVICE_CLASS_ENUM.MESSAGE, {
-            "value_template" : "{{ value }}",
-        })
-        config_calls = get_device_configuration(DEVICE_CLASS_ENUM.CALL)
 
-        notify_configuration = {
-            "device": BASE_DEVICE,
-            "platform": "mqtt",
-            "schema": "json",
-            "uniq_id" : DEVICE_CLASS_ENUM.MESSAGE_SENDER,
-            "name": DEVICE_CLASS_ENUM.MESSAGE_SENDER,
-            "command_topic": COMMAND_SMS_TOPIC,
-            "availability":
-                {
-                    "topic": f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/available",
-                    "payload_available": "online",
-                    "payload_not_available": "offline",
-                },
-        }
+        for topic, data in devices.items():
+            self.publish(topic, data)
 
-        self.publish(f'homeassistant/sensor/{DEVICE_ID}_{DEVICE_CLASS_ENUM.MESSAGE}/config',
-                  json.dumps(config_messages))
-
-        self.publish(f'homeassistant/sensor/{DEVICE_ID}_{DEVICE_CLASS_ENUM.CALL}/config',
-                  json.dumps(config_calls))
-
-        self.publish(f'homeassistant/notify/{DEVICE_ID}_{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/config',
-                  json.dumps(notify_configuration))
-
-    def publish_available_sender(self):
+    def publish_available_sender(self, frequency=15):
         while True:
-            self.publish(f"smsgateway/{DEVICE_CLASS_ENUM.MESSAGE_SENDER}/available", "online")
-            time.sleep(15)
+            self.publish(AVAILABLE_SMS_TOPIC, "online")
+            time.sleep(frequency)
+
 
 def beat():
     try:
@@ -111,16 +110,8 @@ def beat():
     except KeyboardInterrupt:
         print("Exiting...")
 
+
 def main():
-    logging.basicConfig(
-        level=logging.INFO,  # Уровень логгирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат логов
-        datefmt='%Y-%m-%d %H:%M:%S',  # Формат даты и времени
-        handlers=[
-            # logging.FileHandler("app.log"),  # Запись логов в файл
-            logging.StreamHandler()  # Вывод логов в консоль
-        ],
-    )
     modem = ModemCommand()
 
     def send_sms(client, userdata, msg: MQTTMessage):
@@ -130,11 +121,22 @@ def main():
 
     service = HaMQTT()
     service.publish_discovery_messages()
-    service.client.subscribe([(COMMAND_SMS_TOPIC, 0), (COMMAND_SMS_TOPIC_ATTR, 0)])
+    service.client.subscribe(COMMAND_SMS_TOPIC)
     service.client.on_message = send_sms
     service.client.loop_start()
     threading.Thread(target=HaMQTT.publish_available_sender, daemon=True, args=[service]).start()
     beat()
 
+
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,  # Уровень логгирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат логов
+        datefmt='%Y-%m-%d %H:%M:%S',  # Формат даты и времени
+        handlers=[
+            # logging.FileHandler("app.log"),  # Запись логов в файл
+            logging.StreamHandler()  # Вывод логов в консоль
+        ],
+    )
+
     main()
