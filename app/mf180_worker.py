@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 PERIODICAL_TASKS = {
-    commands.ussd("*105#"): 3600,
-    commands.get_all_sms(): 20,
-    commands.get_operator(): 60,
-    commands.get_signal_level(): 60,
+    commands.ussd("*105#"): 1600,
+    commands.get_all_sms(): 45,
+    commands.get_operator(): 50,
+    commands.get_signal_level(): 55,
     commands.get_signal_type(): 60
 }
 
@@ -106,7 +106,8 @@ class mf180:
         self.publish_result(self.call_handler.__name__, row)
 
     def input_sms_handler(self, row):
-        self.publish_result(self.input_sms_handler.__name__, row)
+        in_sms_id = row.split(':')[1].split(',')[1]
+        self.write(command=commands.get_sms_by_id(in_sms_id))
 
     def signal_type_handler(self, row):
         self.publish_result(self.signal_type_handler.__name__, row)

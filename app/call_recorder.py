@@ -29,7 +29,7 @@ def save_to_wav(data, filename):
     """Сохранить данные в формате PCM WAV."""
     with wave.open(filename, 'wb') as wf:
         wf.setnchannels(1)  # Моно
-        wf.setsampwidth(2)  # Биты на выборку (16-бит PCM)
+        wf.setsampwidth(1)  # Биты на выборку (16-бит PCM)
         wf.setframerate(8000)  # Частота дискретизации для μ-law
         wf.writeframes(data)
 
